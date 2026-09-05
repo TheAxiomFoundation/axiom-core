@@ -36,3 +36,71 @@ jobs:
         run: python3 -m unittest discover -s python/tests -v
       - name: Run actual-engine demo
         run: python3 scripts/demo.py
+
+  encoder-interop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Replace only with the reviewed, full commit SHA from the public encoder.
+      ENCODER_REVISION: 472807c909b7155511e56138a29371c81b76ea0d
+    steps:
+      - name: Require an immutable encoder revision
+        shell: bash
+        run: |
+          if [[ ! "$ENCODER_REVISION" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Set ENCODER_REVISION to the reviewed encoder commit SHA."
+            exit 1
+          fi
+      - name: Check out core under test
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Check out the pinned public encoder
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: TheAxiomFoundation/axiom-encode
+          ref: ${{ env.ENCODER_REVISION }}
+          path: encoder
+          persist-credentials: false
+      - name: Confirm the exact encoder checkout
+        shell: bash
+        run: |
+          actual_revision=$(git -C encoder rev-parse HEAD)
+          test "$actual_revision" = "$ENCODER_REVISION"
+      - name: Set up Python 3.13
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.13'
+      - name: Set up uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+      - name: Install locked encoder dependencies
+        working-directory: encoder
+        run: uv sync --locked --python 3.13 --extra dev
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.94.1 --profile minimal
+      - name: Build actual core CLI
+        run: cargo build --locked --workspace
+      - name: Test the encoder against this core binary
+        working-directory: encoder
+        env:
+          AXIOM_CORE_BIN: ${{ github.workspace }}/target/debug/axiom-core
+        run: |
+          test -x "$AXIOM_CORE_BIN"
+          uv run --locked --python 3.13 --extra dev \
+            python -m pytest tests/test_core_export_integration.py \
+            -o addopts='' -q -rs --junitxml="$RUNNER_TEMP/encoder-interop.xml"
+      - name: Require executed interoperability tests without skips
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+
+          report = Path(os.environ["RUNNER_TEMP"]) / "encoder-interop.xml"
+          suites = list(ET.parse(report).getroot().iter("testsuite"))
+          tests = sum(int(suite.attrib["tests"]) for suite in suites)
+          skipped = sum(int(suite.attrib.get("skipped", "0")) for suite in suites)
+          if tests <= 0 or skipped != 0:
+              raise SystemExit(f"Interop gate failed: {tests} tests, {skipped} skipped")
+          print(f"Interop gate passed: {tests} tests, no skips")
+          PY
