@@ -6,6 +6,6 @@
   "reviewed_proposal_sha256": "9c308dd1c32cbf04270a5d2f84e7e86a8fdb63810ac7859cc77967d53e6d4842",
   "review_sha256": "9ef6877e258c782927dc7febeb1f670247004992799b8b9bf4fbebbd1eb118cc",
   "recovered_from_task_transcript": true,
-  "review_sha256_scope": "Verbatim reviewer message text; excludes the saved file provenance header and separator.",
+  "review_sha256_scope": "Verbatim UTF-8 reviewer message text; excludes the saved file provenance header, separator, and final newline added when saving the file.",
   "review_file_sha256": "06eda0900cd7a3b10a93b72254e89bd61fafd42a5c8f13ee36edb23db5a428d8"
 }

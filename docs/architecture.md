@@ -10,7 +10,9 @@ This is a proposed design, not a description of shipped Axiom behavior or author
 
 ## Review decisions and immediate scope
 
-Fable reviewed the [frozen v1](architecture-v1.md) through Subfleet. [Review metadata](fable-review-metadata.json) records the model, run, and reviewed hash. The [review](fable-review.md) and [response/build scope](fable-response.md) preserve its findings and the main author's decisions. Fable has not reviewed this revised version or approved an implementation.
+Fable reviewed the [frozen v1](architecture-v1.md) through Subfleet. [Review metadata](fable-review-metadata.json) records the model, run, and reviewed hash. The [review](fable-review.md) and [response/build scope](fable-response.md) preserve its findings and the main author's decisions. That review covered v1; it is not an approval of this revised version or an implementation. Any later PR review is recorded separately against its reviewed commit.
+
+Archive note: the frozen v1 file retains its original local architecture-review link so its reviewed SHA-256 remains unchanged. That link does not resolve on GitHub; use this repository's [architecture review](architecture-review.md) to read the publication copy. The [Fable review](fable-review.md) is also preserved byte-for-byte.
 
 The target architecture below is larger than the checkpoint now being built. Start with a local `axiom-core` Cargo workspace: explicit RuleSpec closure, immutable development bundle, pinned real engine, strict request handling, complete responses, and a thin Python transport. Use synthetic fixtures to prove software contracts first. Signed admission, a real released program with independent evidence, generated rich clients, publication, and services follow as separate deliverables. Existing signed corpus releases are the source authority to integrate; this work does not replace their ingestion or signing design.
 

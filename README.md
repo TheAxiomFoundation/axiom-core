@@ -11,7 +11,7 @@ The [build status](docs/implementation-status.md) records verification and scope
 
 ## Run it
 
-Use Rust with edition 2024 support and Python 3.10 or later. The first Cargo
+Use Rust 1.94.1 (pinned in `rust-toolchain.toml`) and Python 3.10 or later. The first Cargo
 build needs access to the pinned engine repository and locked crate packages.
 Subsequent bundle compilation, verification, and execution use only local data.
 

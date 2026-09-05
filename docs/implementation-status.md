@@ -6,7 +6,8 @@
 The [proposal](architecture.md) incorporates the decisions from Fable's Subfleet
 review of the [frozen first draft](architecture-v1.md). The [review](fable-review.md)
 and [metadata](fable-review-metadata.json) preserve the exact model, run and
-reviewed content. Fable reviewed the proposal, not this implementation.
+reviewed content. That Fable review covered the proposal; any subsequent PR
+review is recorded separately against its reviewed commit.
 
 ## Delivered
 
@@ -53,5 +54,12 @@ Signed admission, publication, source-authority integration, generated rich
 clients, services and durable jobs are not implemented here. The pinned engine's
 unresolved type and arithmetic guarantees also remain upstream work.
 
-This repository is local. No GitHub repository, PR, deployment, publication, or
-migration of existing Axiom repositories was performed.
+At completion of this initial local checkpoint, no GitHub repository, PR,
+deployment, publication, or migration of existing Axiom repositories had been
+performed.
+
+Publication preparation, 4 September 2026: the checkpoint is being prepared for
+a draft PR in the private `TheAxiomFoundation/axiom-core` repository. This
+document does not claim that the PR has opened or that Fable has reviewed its
+implementation. The earlier proposal review and local implementation review
+remain distinct historical records.
