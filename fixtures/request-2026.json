@@ -1,0 +1,33 @@
+{
+  "mode": "explain",
+  "dataset": {
+    "inputs": [
+      {
+        "name": "zz:policies/demo#input.income",
+        "entity_id": "household:1",
+        "value": {
+          "kind": "decimal",
+          "value": "123.456"
+        },
+        "entity": "Household",
+        "interval": {
+          "start": "2026-01-01",
+          "end": "2026-01-31"
+        }
+      }
+    ]
+  },
+  "queries": [
+    {
+      "entity_id": "household:1",
+      "period": {
+        "period_kind": "month",
+        "start": "2026-01-01",
+        "end": "2026-01-31"
+      },
+      "outputs": [
+        "zz:policies/demo#benefit"
+      ]
+    }
+  ]
+}

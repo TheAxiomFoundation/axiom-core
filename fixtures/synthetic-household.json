@@ -1,0 +1,8 @@
+{
+  "format": "axiom/build-spec/v0",
+  "root": "zz:policies/demo",
+  "modules": {
+    "zz:policies/demo": "# SYNTHETIC SOFTWARE FIXTURE. This is not a real benefit program.\nformat: rulespec/v1\nimports:\n  - zz:policies/parameters\nrules:\n  - name: benefit\n    kind: derived\n    entity: Household\n    dtype: Money\n    unit: USD\n    period: Month\n    rounding: half_up\n    versions:\n      - effective_from: 2026-01-01\n        effective_to: 2027-12-31\n        formula: max(0, base_amount - income * 0.3)\n",
+    "zz:policies/parameters": "# SYNTHETIC SOFTWARE FIXTURE. These amounts do not encode law.\nformat: rulespec/v1\nrules:\n  - name: base_amount\n    kind: parameter\n    dtype: Money\n    unit: USD\n    versions:\n      - effective_from: 2026-01-01\n        effective_to: 2026-12-31\n        formula: \"200\"\n      - effective_from: 2027-01-01\n        effective_to: 2027-12-31\n        formula: \"250\"\n"
+  }
+}

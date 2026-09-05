@@ -1,0 +1,11 @@
+{
+  "run_id": "20260904-175824-axiom-architecture-proposal",
+  "model": "claude-fable-5-1",
+  "session_id": "0461e1b6-1d83-4eab-b5c2-25478d7daf40",
+  "message_id": "b6567630-d7ed-4b36-8324-d7c7012c1db9",
+  "reviewed_proposal_sha256": "9c308dd1c32cbf04270a5d2f84e7e86a8fdb63810ac7859cc77967d53e6d4842",
+  "review_sha256": "9ef6877e258c782927dc7febeb1f670247004992799b8b9bf4fbebbd1eb118cc",
+  "recovered_from_task_transcript": true,
+  "review_sha256_scope": "Verbatim UTF-8 reviewer message text; excludes the saved file provenance header, separator, and final newline added when saving the file.",
+  "review_file_sha256": "06eda0900cd7a3b10a93b72254e89bd61fafd42a5c8f13ee36edb23db5a428d8"
+}
