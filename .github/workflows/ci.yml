@@ -73,9 +73,9 @@ jobs:
           python-version: '3.13'
       - name: Set up uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
-      - name: Install frozen encoder dependencies
+      - name: Install locked encoder dependencies
         working-directory: encoder
-        run: uv sync --frozen --python 3.13 --extra dev
+        run: uv sync --locked --python 3.13 --extra dev
       - name: Install pinned Rust toolchain
         run: rustup toolchain install 1.94.1 --profile minimal
       - name: Build actual core CLI
@@ -84,7 +84,23 @@ jobs:
         working-directory: encoder
         env:
           AXIOM_CORE_BIN: ${{ github.workspace }}/target/debug/axiom-core
-        run: >-
-          uv run --frozen --python 3.13 --extra dev
-          python -m pytest tests/test_core_export_integration.py
-          -o addopts='' -q -rs
+        run: |
+          test -x "$AXIOM_CORE_BIN"
+          uv run --locked --python 3.13 --extra dev \
+            python -m pytest tests/test_core_export_integration.py \
+            -o addopts='' -q -rs --junitxml="$RUNNER_TEMP/encoder-interop.xml"
+      - name: Require executed interoperability tests without skips
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+
+          report = Path(os.environ["RUNNER_TEMP"]) / "encoder-interop.xml"
+          suites = list(ET.parse(report).getroot().iter("testsuite"))
+          tests = sum(int(suite.attrib["tests"]) for suite in suites)
+          skipped = sum(int(suite.attrib.get("skipped", "0")) for suite in suites)
+          if tests <= 0 or skipped != 0:
+              raise SystemExit(f"Interop gate failed: {tests} tests, {skipped} skipped")
+          print(f"Interop gate passed: {tests} tests, no skips")
+          PY

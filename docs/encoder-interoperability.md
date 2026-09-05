@@ -3,7 +3,7 @@
 The private core repository owns CI for the encoder-to-core boundary. Its
 `encoder-interop` job checks out an immutable commit of the public
 `TheAxiomFoundation/axiom-encode` repository, installs its locked Python 3.13
-development dependencies with `uv --frozen`, and builds the actual core CLI from
+development dependencies with `uv --locked`, and builds the actual core CLI from
 the core revision under test. The existing `conformance` job continues to check
 core's Rust contracts, Python transport, and native-engine demo.
 
@@ -13,6 +13,10 @@ not need access to the private core repository. Core CI sets it to the binary
 it just built, so the integration suite runs against real software without a
 mock, substitute evaluator, or private-repository credential in public CI. An
 invalid configured binary fails the tests rather than falling back or skipping.
+Core CI requires an executable binary before pytest and checks its JUnit report
+for at least one test and zero skips. Test failures, missing or invalid reports,
+and an empty or skipped suite all fail the job. Locked dependency installation
+also rejects a lockfile that is stale relative to the encoder project metadata.
 
 ## What the job verifies
 
@@ -57,8 +61,8 @@ cargo build --locked --workspace
 export AXIOM_CORE_BIN="$(pwd)/target/debug/axiom-core"
 
 # From the separate encoder checkout at ENCODER_REVISION:
-uv sync --frozen --python 3.13 --extra dev
-uv run --frozen --python 3.13 --extra dev python -m pytest \
+env -u UV_FROZEN uv sync --locked --python 3.13 --extra dev
+env -u UV_FROZEN uv run --locked --python 3.13 --extra dev python -m pytest \
   tests/test_core_export_integration.py -o addopts='' -q -rs
 ```
 
