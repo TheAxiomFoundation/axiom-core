@@ -53,9 +53,22 @@ relation or query intervals, and unsupported assessment dates are errors. Any
 selection is not implemented. Valid-time rule versions use the native engine's
 interval semantics. This does not infer dimensional validity of arbitrary periods.
 
+The pinned engine selects derived-rule and parameter versions using
+`period.start`. It does not split or prorate a query across version boundaries,
+and a `month` label does not require a calendar-month interval. A custom period
+spanning December 2026 through January 2027 therefore selects the 2026 version
+when an input covers that whole interval. The facade checks interval ordering;
+it preserves these native temporal semantics.
+
 Dataset binding uses the native strict binder before execution. Rule pins use
 the existing engine's rule names. A pin creates a request scenario and modifies
 an in-memory execution copy; it does not rewrite the stored baseline artifact.
+
+An input record's `entity` field participates in relation-slot diagnostics, but
+scalar lookup uses the input name, `entity_id`, and period. Changing only `entity`
+can therefore leave execution unchanged when no relation diagnostic applies.
+Strict parsing rejects unrecognized fields; it does not give recognized fields
+semantics beyond those implemented by the pinned engine.
 
 The private `axiom/execution-receipt/v0` records:
 

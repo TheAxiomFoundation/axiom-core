@@ -89,6 +89,51 @@ class RustTransportIntegrationTests(unittest.TestCase):
             in_2027["result"]["results"][0]["outputs"],
         )
 
+    def test_isolated_input_entity_label_matches_current_native_semantics(self):
+        # This fixture has no relations. The pinned engine's input lookup
+        # uses name, entity_id, and interval, not the supplied entity label.
+        baseline = self.receipt(self.request_2026)
+        request = copy.deepcopy(self.request_2026)
+        request["dataset"]["inputs"][0]["entity"] = "Person"
+        self.assertEqual(self.receipt(request), baseline)
+        self.assertEqual(self.direct_receipt(request), baseline)
+
+    def test_integer_pin_on_money_rule_preserves_native_value_kind(self):
+        request = copy.deepcopy(self.request_2026)
+        request["pins"] = [{"rule": "benefit", "value": {"kind": "integer", "value": 5}}]
+        receipt = self.receipt(request)
+        self.assertEqual(receipt, self.direct_receipt(request))
+        output_id = request["queries"][0]["outputs"][0]
+        output = receipt["result"]["results"][0]["outputs"][output_id]
+        # Conformance to the pinned engine, not a claim of pin type safety:
+        # the Money rule's wire dtype is decimal but the literal stays integer.
+        self.assertEqual(output["dtype"], "decimal")
+        self.assertEqual(output["value"], {"kind": "integer", "value": 5})
+
+    def test_fast_mode_preserves_actual_engine_mode_and_metadata(self):
+        request = copy.deepcopy(self.request_2026)
+        request["mode"] = "fast"
+        receipt = self.receipt(request)
+        self.assertEqual(receipt, self.direct_receipt(request))
+        self.assertEqual(receipt["result"]["metadata"], {
+            "requested_mode": "fast", "actual_mode": "fast", "fallback_reason": None,
+        })
+        self.assertEqual(receipt["result"]["results"][0]["trace"], {})
+        self.assertEqual(
+            receipt["result"]["results"][0]["outputs"],
+            self.receipt(self.request_2026)["result"]["results"][0]["outputs"],
+        )
+
+    def test_nonexistent_and_parameter_rule_pins_fail_execution(self):
+        for rule in ("nonexistent", "base_amount"):
+            with self.subTest(rule=rule):
+                request = copy.deepcopy(self.request_2026)
+                request["pins"] = [{"rule": rule, "value": {"kind": "decimal", "value": "0"}}]
+                self.assert_rejected_like_cli(request)
+                with self.assertRaises(AxiomCoreError) as caught:
+                    self.receipt(request)
+                self.assertEqual(caught.exception.code, "execution_failed")
+
     def test_empty_scenario_matches_baseline_and_execution_preserves_bundle(self):
         original_bundle = self.bundle.read_bytes()
         baseline = self.receipt(self.request_2026)
@@ -147,6 +192,43 @@ class RustTransportIntegrationTests(unittest.TestCase):
     def test_wrong_expected_digest_is_rejected(self):
         with self.assertRaises(AxiomCoreError):
             execute(self.bundle, "0" * 64, self.request_2026, binary=self.binary)
+
+    def test_short_and_uppercase_expected_digests_are_invalid(self):
+        for digest in (self.digest[:-1], "A" + "0" * 63):
+            with self.subTest(digest=digest):
+                completed = self.cli("run", "--bundle", self.bundle, "--expect", digest, request=self.request_2026)
+                self.assertNotEqual(completed.returncode, 0)
+                with self.assertRaises(AxiomCoreError) as caught:
+                    execute(self.bundle, digest, self.request_2026, binary=self.binary)
+                self.assertEqual(caught.exception.code, "invalid_digest")
+                self.assertEqual(caught.exception.response, json.loads(completed.stderr))
+
+    def test_build_refuses_overwrite_without_changing_original_bytes(self):
+        original = self.bundle.read_bytes()
+        with self.assertRaises(AxiomCoreError) as caught:
+            build(REPO / "fixtures/synthetic-household.json", self.bundle, binary=self.binary)
+        self.assertEqual(caught.exception.code, "io_error")
+        self.assertEqual(self.bundle.read_bytes(), original)
+
+    def test_request_file_and_stdin_preserve_identical_full_receipts(self):
+        request_file = Path(self.scratch.name) / "request.json"
+        request_file.write_text(json.dumps(self.request_2026), encoding="utf-8")
+        completed = self.cli("run", "--bundle", self.bundle, "--expect", self.digest, "--request", request_file)
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(json.loads(completed.stdout), self.direct_receipt(self.request_2026))
+        self.assertEqual(json.loads(completed.stdout), self.receipt(self.request_2026))
+
+    def test_request_one_byte_over_input_limit_is_rejected(self):
+        limit = 16 * 1024 * 1024
+        request = json.dumps(self.request_2026).encode("utf-8")
+        request_file = Path(self.scratch.name) / "oversized-request.json"
+        # Otherwise valid request JSON, so failure must be the byte limit.
+        request_file.write_bytes(request + b" " * (limit + 1 - len(request)))
+        self.assertEqual(request_file.stat().st_size, limit + 1)
+        completed = self.cli("run", "--bundle", self.bundle, "--expect", self.digest, "--request", request_file)
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertEqual(json.loads(completed.stderr)["error"]["code"], "input_too_large")
+        self.assertEqual(completed.stdout, "")
 
     def test_build_rejects_unreadable_large_bundle_before_creating_file(self):
         spec = json.loads((REPO / "fixtures/synthetic-household.json").read_text())

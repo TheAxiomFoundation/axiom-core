@@ -307,6 +307,172 @@ mod tests {
         parse_request(&serde_json::to_string(value).unwrap())
     }
 
+    fn verified_synthetic_bundle(spec: crate::bundle::BuildSpec) -> crate::bundle::VerifiedBundle {
+        let built = crate::bundle::build(&spec).unwrap();
+        crate::bundle::verify(&built, &built.manifest_sha256).unwrap()
+    }
+
+    #[test]
+    fn facade_strict_preflight_rejects_relation_slot_entity_mismatch() {
+        // Synthetic entity markers, not an encoding of any legal program.
+        let root = "zz:policies/relation-demo";
+        let source = r#"
+# SYNTHETIC SOFTWARE FIXTURE. These markers do not encode law.
+format: rulespec/v1
+rules:
+  - name: member_of_household
+    kind: data_relation
+    data_relation:
+      arity: 2
+      arguments: [Person, Household]
+  - name: person_marker
+    kind: derived
+    entity: Person
+    dtype: Integer
+    effective_from: 2026-01-01
+    formula: person_value
+  - name: household_marker
+    kind: derived
+    entity: Household
+    dtype: Integer
+    effective_from: 2026-01-01
+    formula: household_value
+"#;
+        let bundle = verified_synthetic_bundle(crate::bundle::BuildSpec {
+            format: crate::bundle::BUILD_FORMAT.into(),
+            root: root.into(),
+            modules: std::collections::BTreeMap::from([(root.into(), source.into())]),
+        });
+        let interval = json!({"start":"2026-01-01", "end":"2026-01-31"});
+        let mut request = json!({
+            "mode":"explain",
+            "dataset": {
+                "inputs": [
+                    {"name":format!("{root}#input.person_value"), "entity":"Person", "entity_id":"person:1",
+                     "interval":interval, "value":{"kind":"integer", "value":1}},
+                    {"name":format!("{root}#input.household_value"), "entity":"Household", "entity_id":"household:1",
+                     "interval":interval, "value":{"kind":"integer", "value":2}}
+                ],
+                "relations":[{"name":format!("{root}#relation.member_of_household"),
+                    "tuple":["person:1", "household:1"], "interval":interval}]
+            },
+            "queries":[{
+                "entity_id":"household:1", "outputs":[format!("{root}#household_marker")],
+                "period":{"period_kind":"month", "start":"2026-01-01", "end":"2026-01-31"}
+            }]
+        });
+        // Prove that this exact public bundle/request pair executes when the
+        // tuple agrees with the entity kinds supplied by input records.
+        let valid = execute(&bundle, &request.to_string()).unwrap();
+        let output = serde_json::to_value(valid.result).unwrap();
+        assert_eq!(
+            output["results"][0]["outputs"][format!("{root}#household_marker")]["value"]["value"],
+            2
+        );
+
+        request["dataset"]["relations"][0]["tuple"] = json!(["household:1", "person:1"]);
+        let error = execute(&bundle, &request.to_string()).unwrap_err();
+        assert_eq!(error.code, "invalid_dataset");
+        assert!(error.message.contains("member_of_household"), "{error}");
+        assert!(error.message.contains("expected `Person`"), "{error}");
+        assert!(error.message.contains("found `Household`"), "{error}");
+    }
+
+    #[test]
+    fn facade_rejects_unknown_input_identifier_during_preflight() {
+        let spec =
+            crate::parse_json(include_str!("../../../fixtures/synthetic-household.json")).unwrap();
+        let bundle = verified_synthetic_bundle(spec);
+        let mut request: Value =
+            serde_json::from_str(include_str!("../../../fixtures/request-2026.json")).unwrap();
+        assert!(execute(&bundle, &request.to_string()).is_ok());
+        request["dataset"]["inputs"][0]["name"] = json!("zz:policies/demo#input.other");
+        let error = execute(&bundle, &request.to_string()).unwrap_err();
+        assert_eq!(
+            error.code, "invalid_dataset",
+            "must fail before runtime execution"
+        );
+        assert!(
+            error.message.contains("zz:policies/demo#input.other"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn facade_straddling_period_selects_derived_and_parameter_versions_at_start() {
+        // Synthetic markers distinguish both formula and parameter versions;
+        // every result below is produced by the verified native runtime.
+        let root = "zz:policies/temporal-demo";
+        let source = r#"
+# SYNTHETIC SOFTWARE FIXTURE. These amounts and formulas do not encode law.
+format: rulespec/v1
+rules:
+  - name: base_amount
+    kind: parameter
+    dtype: Money
+    unit: USD
+    versions:
+      - effective_from: 2026-01-01
+        effective_to: 2026-12-31
+        formula: "200"
+      - effective_from: 2027-01-01
+        effective_to: 2027-12-31
+        formula: "250"
+  - name: amount_marker
+    kind: derived
+    entity: Household
+    dtype: Money
+    unit: USD
+    period: Month
+    versions:
+      - effective_from: 2026-01-01
+        effective_to: 2026-12-31
+        formula: base_amount + income
+      - effective_from: 2027-01-01
+        effective_to: 2027-12-31
+        formula: base_amount - income
+"#;
+        let bundle = verified_synthetic_bundle(crate::bundle::BuildSpec {
+            format: crate::bundle::BUILD_FORMAT.into(),
+            root: root.into(),
+            modules: std::collections::BTreeMap::from([(root.into(), source.into())]),
+        });
+        let request = json!({
+            "mode":"explain",
+            "dataset":{"inputs":[{
+                "name":format!("{root}#input.income"), "entity":"Household", "entity_id":"household:1",
+                "interval":{"start":"2026-12-01", "end":"2027-01-31"},
+                "value":{"kind":"decimal", "value":"10"}
+            }]},
+            "queries":[
+                {"entity_id":"household:1", "outputs":[format!("{root}#amount_marker")],
+                 "period":{"period_kind":"custom", "name":"synthetic-straddling-window", "start":"2026-12-01", "end":"2027-01-31"}},
+                {"entity_id":"household:1", "outputs":[format!("{root}#amount_marker")],
+                 "period":{"period_kind":"custom", "name":"synthetic-january-window", "start":"2027-01-01", "end":"2027-01-31"}}
+            ]
+        });
+        let receipt = execute(&bundle, &request.to_string()).unwrap();
+        let result = serde_json::to_value(receipt.result).unwrap();
+        let output_id = format!("{root}#amount_marker");
+        let crossing = &result["results"][0];
+        let january = &result["results"][1];
+        assert_eq!(crossing["outputs"][&output_id]["value"]["value"], "210");
+        assert_eq!(january["outputs"][&output_id]["value"]["value"], "240");
+        assert_eq!(crossing["period"], request["queries"][0]["period"]);
+        assert_eq!(
+            crossing["trace"][&output_id]["parameter_reads"][0]["effective_from"],
+            "2026-01-01"
+        );
+        assert_eq!(
+            crossing["trace"][&output_id]["parameter_reads"][0]["effective_to"],
+            "2026-12-31"
+        );
+        assert_eq!(
+            january["trace"][&output_id]["parameter_reads"][0]["effective_from"],
+            "2027-01-01"
+        );
+    }
+
     #[test]
     fn keeps_native_pins_and_accepts_engine_decimal_integer_wire_form() {
         let mut value = request_value();

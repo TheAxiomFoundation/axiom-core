@@ -200,6 +200,33 @@ mod identity_tests {
     use super::*;
 
     #[test]
+    fn declared_engine_revision_matches_exact_locked_git_source() {
+        let lock = include_str!("../../../Cargo.lock");
+        let engine_packages: Vec<_> = lock
+            .split("[[package]]")
+            .filter(|package| {
+                package
+                    .lines()
+                    .any(|line| line == "name = \"axiom-rules-engine\"")
+            })
+            .collect();
+        assert_eq!(
+            engine_packages.len(),
+            1,
+            "exactly one engine dependency is expected"
+        );
+        let expected_source = format!(
+            "source = \"git+https://github.com/TheAxiomFoundation/axiom-rules-engine?rev={ENGINE_REVISION}#{ENGINE_REVISION}\""
+        );
+        assert!(
+            engine_packages[0]
+                .lines()
+                .any(|line| line == expected_source),
+            "ENGINE_REVISION must name both the requested and resolved Cargo.lock Git revision"
+        );
+    }
+
+    #[test]
     fn identity_binds_embedded_lock_and_readable_execution_host() {
         let identity = engine_identity().unwrap();
         assert_eq!(
