@@ -104,9 +104,9 @@ engine identity, import closure, strict parsing, periods, pins, and CLI/Python
 receipt equality. Synthetic tests establish software behavior only.
 
 [Encoder interoperability CI](docs/encoder-interoperability.md) runs the public
-encoder's opt-in integration tests against the actual core binary. The private
-core workflow pins the encoder commit; public encoder CI can run without access
-to this repository.
+encoder's opt-in integration tests against the actual core binary. The core
+workflow pins the encoder commit; encoder CI runs without a core binary and
+skips these integration tests.
 
 The next checkpoint is one real program across two signed source revisions,
 with an independently authorized expected workload and explicit evidence.
