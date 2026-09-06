@@ -42,7 +42,7 @@ jobs:
     timeout-minutes: 20
     env:
       # Replace only with the reviewed, full commit SHA from the public encoder.
-      ENCODER_REVISION: 472807c909b7155511e56138a29371c81b76ea0d
+      ENCODER_REVISION: 629b8f9fd5fc511ff82d58d23790cc29d460096b
     steps:
       - name: Require an immutable encoder revision
         shell: bash
