@@ -1,6 +1,6 @@
 # Encoder interoperability
 
-The private core repository owns CI for the encoder-to-core boundary. Its
+The core repository owns CI for the encoder-to-core boundary. Its
 `encoder-interop` job checks out an immutable commit of the public
 `TheAxiomFoundation/axiom-encode` repository, installs its locked Python 3.13
 development dependencies with `uv --locked`, and builds the actual core CLI from
@@ -8,10 +8,9 @@ the core revision under test. The existing `conformance` job continues to check
 core's Rust contracts, Python transport, and native-engine demo.
 
 The encoder's integration suite requires an explicit `AXIOM_CORE_BIN` file path.
-Public encoder CI leaves it unset and reports these tests as skipped. It does
-not need access to the private core repository. Core CI sets it to the binary
-it just built, so the integration suite runs against real software without a
-mock, substitute evaluator, or private-repository credential in public CI. An
+Encoder CI leaves it unset and reports these tests as skipped. Both repositories
+are public. Core CI sets it to the binary it just built, so the integration suite
+runs against the core revision under test. An
 invalid configured binary fails the tests rather than falling back or skipping.
 Core CI requires an executable binary before pytest and checks its JUnit report
 for at least one test and zero skips. Test failures, missing or invalid reports,
@@ -20,8 +19,9 @@ also rejects a lockfile that is stale relative to the encoder project metadata.
 
 ## What the job verifies
 
-The synthetic fixtures exercise the actual encoder CLI's
-`export-core-build-spec` command and core's `build`, `verify`, and `run` commands:
+The six integration tests use synthetic fixtures with the actual encoder CLI's
+`export-core-build-spec` command or its `build_spec_from_eval_result` adapter,
+followed by core's `build`, `verify`, and `run` commands:
 
 - Explicit two-module closure with a fragment import and native explanation
   fields, including parameter reads and rounding details.
@@ -32,6 +32,10 @@ The synthetic fixtures exercise the actual encoder CLI's
 - Changing a dependency changes bundle and artifact identities and the native
   output. A native zero pin changes execution while retaining the stored bundle
   and its baseline behavior.
+- The EvalResult adapter requires the selected candidate's recorded SHA-256,
+  retains its exact bytes, and exports it for native execution. Its fixture is
+  an explicitly synthetic evaluation result; this does not test model generation
+  or establish that an evaluation or its candidate passed legal validation.
 
 Export remains an `unvalidated_candidate`; successful execution creates an
 unsigned development receipt. These checks establish software interoperability,
